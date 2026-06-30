@@ -1,0 +1,26 @@
+{
+  "configurations": [
+    {
+      "name": "sx1280-hc32",
+      "includePath": [
+        "${workspaceFolder}/mcu/common",
+        "${workspaceFolder}/driver/inc",
+        "${workspaceFolder}/project/source",
+        "${workspaceFolder}/sx1280/driver",
+        "${workspaceFolder}/sx1280/driver/rangingCorrection",
+        "${workspaceFolder}/sx1280/hal/hc32",
+        "${workspaceFolder}/sx1280/app",
+        "${workspaceFolder}/sx1280/app/ranging",
+        "${workspaceFolder}/sx1280/app/lcd"
+      ],
+      "defines": [
+        "__CC_ARM",
+        "HC32L021"
+      ],
+      "cStandard": "c11",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "windows-gcc-x64"
+    }
+  ],
+  "version": 4
+}

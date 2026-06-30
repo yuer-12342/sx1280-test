@@ -1,0 +1,20 @@
+# Keil / IAR build outputs
+**/MDK/output/
+**/EWARM/**/Obj/
+**/EWARM/**/List/
+**/EWARM/**/Exe/
+*.uvguix*
+*.uvoptx
+*.bak
+JLinkLog.txt
+*.dep
+*.lnp
+*.build_log.htm
+
+# VS Code / IDE
+.vscode/.cache/
+.cursor/
+
+# OS
+Thumbs.db
+Desktop.ini
