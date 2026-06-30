@@ -5,12 +5,16 @@
 #include "shared_spi_bus.h"
 #include "ranging_fence.h"
 #include "ranging_publish.h"
+#include "ranging_dev_log.h"
 
 /*
  * 烧录前修改 DEMO_SETTING_ENTITY 为 DEMO_ROLE_MASTER 或 DEMO_ROLE_SLAVE。
  *
  * DEMO_RNG_CONTINUOUS_MODE=1：连续短会话 + 轮末门控/滤波（app/ranging/ranging_fence.c）。
  * DEMO_RNG_CONTINUOUS_MODE=0：按键触发 demo（30 样本/轮）。
+ *
+ * MASTER/SLAVE 共用：InitApplication、continuous 参数、SetRadioParameters（SF7+BW800）。
+ * 标定 Watch：g_RangingDevLog（validity / gate / round_m / distance_m / rssi）。
  */
 
 #define DEMO_ROLE_MASTER  0
@@ -42,6 +46,17 @@ static void RangingDemoKeyWaitIdle(void)
 }
 #endif
 
+#if ( DEMO_SETTING_ENTITY == DEMO_ROLE_MASTER )
+static void RangingAppProcessRound(void)
+{
+    DemoResult_t *roundResult = RangingDemoGetResult();
+
+    RangingFenceProcessRound( roundResult, RangingDemoGetConfiguration() );
+    RangingPublishUpdateFromRound( roundResult, RangingDemoGetConfiguration() );
+    RangingDevLogUpdate();
+}
+#endif
+
 int main(void)
 {
     RangingDemoStatus_t demoStatus;
@@ -49,8 +64,11 @@ int main(void)
     HwInit();
 
     RangingDemoInitApplication(DEMO_SETTING_ENTITY);
+
+#if ( DEMO_SETTING_ENTITY == DEMO_ROLE_MASTER )
     RangingFenceInit();
     RangingPublishInit();
+#endif
 
 #if ( DEMO_RNG_CONTINUOUS_MODE == 1 )
     RangingDemoSetContinuousMode(1u);
@@ -68,7 +86,7 @@ int main(void)
 #if ( DEMO_USE_TFT == 1 )
     RangingDisplayInit();
     SharedSpiEnsureBusIdle();
- #endif
+#endif
 
     Radio.Reset();
 
@@ -104,12 +122,8 @@ int main(void)
 #endif
         } while( demoStatus == DEMO_RANGING_RUNNING );
 
-        {
-            DemoResult_t *roundResult = RangingDemoGetResult();
+        RangingAppProcessRound();
 
-            RangingFenceProcessRound( roundResult, RangingDemoGetConfiguration() );  //门控
-            RangingPublishUpdateFromRound( roundResult, RangingDemoGetConfiguration() ); //测距距结果发布
-        }
 #if ( DEMO_USE_TFT == 1 )
         RangingDisplayForceUpdate();
 #endif
@@ -131,12 +145,8 @@ int main(void)
 #endif
         } while( demoStatus == DEMO_RANGING_RUNNING );
 
-        {
-            DemoResult_t *roundResult = RangingDemoGetResult();
+        RangingAppProcessRound();
 
-            RangingFenceProcessRound( roundResult, RangingDemoGetConfiguration() );
-            RangingPublishUpdateFromRound( roundResult, RangingDemoGetConfiguration() );
-        }
 #if ( DEMO_USE_TFT == 1 )
         RangingDisplayForceUpdate();
 #endif
@@ -150,13 +160,3 @@ int main(void)
 
     return 0;
 }
-
-
-
-
-
-
-
-
-
-

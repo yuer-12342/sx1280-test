@@ -624,6 +624,16 @@
               <FilePath>..\..\sx1280\app\ranging\ranging_publish.h</FilePath>
             </File>
             <File>
+              <FileName>ranging_dev_log.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\sx1280\app\ranging\ranging_dev_log.c</FilePath>
+            </File>
+            <File>
+              <FileName>ranging_dev_log.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\sx1280\app\ranging\ranging_dev_log.h</FilePath>
+            </File>
+            <File>
               <FileName>FreqLUT.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\..\sx1280\app\ranging\FreqLUT.h</FilePath>

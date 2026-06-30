@@ -5,13 +5,22 @@
 #include "ranging_publish.h"
 
 #define RNG_DISPLAY_HOLD    250u
+#define RNG_DISPLAY_RAW     251u
 
-/* 12px 字体行距 16；RSSI 原 y=88 区域屏坏，改到 IS 之后 */
-#define ROW_Y_SAMP          72u
-#define ROW_Y_HTX           104u
-#define ROW_Y_IS            120u
-#define ROW_Y_RSSI          136u
+/*
+ * 80x160 标定屏布局（12px 字，行距 16）
+ * Stat/Dist/Rnd/Hop/Gate/RSSI/No/Htx — 均来自 RangingPublish（轮末更新）
+ */
+#define COL_LBL_X           2u
 #define COL_VAL_X           38u
+#define ROW_Y_STAT          18u
+#define ROW_Y_DIST          34u
+#define ROW_Y_RND           50u
+#define ROW_Y_HOP           66u
+#define ROW_Y_GATE          82u
+#define ROW_Y_RSSI          98u
+#define ROW_Y_NO            114u
+#define ROW_Y_HTX           130u
 
 static const u8 *RangingDisplayStatusText(uint8_t status)
 {
@@ -25,6 +34,8 @@ static const u8 *RangingDisplayStatusText(uint8_t status)
         return (const u8 *)"TOut";
     case RNG_PER_ERROR:
         return (const u8 *)"Err";
+    case RNG_DISPLAY_RAW:
+        return (const u8 *)"Raw";
     case RNG_INIT:
     default:
         if (status == RNG_DISPLAY_HOLD)
@@ -35,16 +46,22 @@ static const u8 *RangingDisplayStatusText(uint8_t status)
     }
 }
 
-static void RangingDisplayShowU16(u16 x, u16 y, uint16_t num, u16 fc, u16 bc)
+static void RangingDisplayShowU16(u16 x, u16 y, uint16_t num, u8 width, u16 fc, u16 bc)
 {
     u8 i;
-    u16 div = 10000;
+    u16 div = 1u;
+    u8 w;
 
-    for (i = 0; i < 5; i++)
+    for (w = 1u; w < width; w++)
     {
-        u8 digit = (u8)((num / div) % 10);
-        LCD_ShowChar((u16)(x + i * 6), y, (u8)('0' + digit), fc, bc, 12, 0);
-        div /= 10;
+        div = (u16)( div * 10u );
+    }
+
+    for (i = 0u; i < width; i++)
+    {
+        u8 digit = (u8)((num / div) % 10u);
+        LCD_ShowChar((u16)(x + i * 6u), y, (u8)('0' + digit), fc, bc, 12, 0);
+        div /= 10u;
     }
 }
 
@@ -73,32 +90,6 @@ static void RangingDisplayShowDistance(u16 x, u16 y, float dist, u16 fc, u16 bc)
         LCD_ShowChar((u16)(x + 12u), y, (u8)('0' + fpart / 10u), fc, bc, 12, 0);
         LCD_ShowChar((u16)(x + 18u), y, (u8)('0' + fpart % 10u), fc, bc, 12, 0);
     }
-}
-
-static int8_t RangingDisplayGetRssi(DemoResult_t *res)
-{
-    int8_t rssi;
-
-    if( res->RngResultIndex > 0u )
-    {
-        rssi = res->RawRngRssi[res->RngResultIndex - 1u];
-        if( rssi != 0 )
-        {
-            return rssi;
-        }
-    }
-
-    return (int8_t)res->RssiValue;
-}
-
-static uint16_t RangingDisplayGetHandshakeTx(DemoResult_t *res)
-{
-    if( ( res->CntPacketTx == 0u ) && ( res->CntPacketRxOK > 0u ) )
-    {
-        return 1u;
-    }
-
-    return (uint16_t)res->CntPacketTx;
 }
 
 #define RSSI_FIELD_WIDTH    5u
@@ -164,6 +155,42 @@ static void RangingDisplayShowStatusFixed(u16 x, u16 y, const u8 *text, u16 fc, 
     LCD_ShowString(x, y, buf, fc, bc, 12, 0);
 }
 
+static const u8 *RangingDisplayGateText( RangingFenceGateReason_t reason )
+{
+    switch( reason )
+    {
+    case RNG_FENCE_GATE_OK:
+        return (const u8 *)"OK  ";
+    case RNG_FENCE_GATE_INVALID_STATUS:
+        return (const u8 *)"InvS";
+    case RNG_FENCE_GATE_LOW_SAMPLES:
+        return (const u8 *)"LowS";
+    case RNG_FENCE_GATE_BAD_RSSI:
+        return (const u8 *)"Rssi";
+    case RNG_FENCE_GATE_HIGH_SPREAD:
+        return (const u8 *)"Sprd";
+    case RNG_FENCE_GATE_JUMP:
+        return (const u8 *)"Jump";
+    default:
+        return (const u8 *)"??? ";
+    }
+}
+
+static void RangingDisplayShowGate( u16 x, u16 y, RangingFenceGateReason_t reason, u16 fc, u16 bc )
+{
+    RangingDisplayShowStatusFixed( x, y, RangingDisplayGateText( reason ), fc, bc );
+}
+
+static void RangingDisplayShowDashDist(u16 x, u16 y, u16 fc, u16 bc)
+{
+    LCD_ShowString(x, y, (const u8 *)"--.--", fc, bc, 12, 0);
+}
+
+static void RangingDisplayShowDashField(u16 x, u16 y, u16 fc, u16 bc)
+{
+    LCD_ShowString(x, y, (const u8 *)"-----", fc, bc, 12, 0);
+}
+
 static uint8_t RangingDisplayResolveStatus(uint8_t status, DemoResult_t *res)
 {
     const RangingFenceOutput_t *fence = RangingFenceGetOutput();
@@ -195,7 +222,11 @@ static uint8_t RangingDisplayResolveStatus(uint8_t status, DemoResult_t *res)
         {
             return RNG_DISPLAY_HOLD;
         }
-        if( ( pub->validity == RNG_PUBLISH_OK ) || ( pub->validity == RNG_PUBLISH_RAW ) )
+        if( pub->validity == RNG_PUBLISH_RAW )
+        {
+            return RNG_DISPLAY_RAW;
+        }
+        if( pub->validity == RNG_PUBLISH_OK )
         {
             return RNG_VALID;
         }
@@ -228,61 +259,27 @@ static uint8_t RangingDisplayResolveStatus(uint8_t status, DemoResult_t *res)
     return RNG_PER_ERROR;
 }
 
-static double RangingDisplayPickDistance( DemoResult_t *res, uint8_t showStatus )
-{
-    const RangingPublish_t *pub = RangingPublishGet();
-
-    if( ( pub->round_index > 0u ) && ( pub->distance_m > 0.0f ) )
-    {
-        return (double)pub->distance_m;
-    }
-
-    const RangingFenceOutput_t *fence = RangingFenceGetOutput();
-
-    /* 首轮尚未 Publish 时回退 */
-    if( ( showStatus == RNG_VALID ) && ( fence->gatePassed != 0u ) )
-    {
-        return fence->publishedDistance;
-    }
-    if( res->RngDistance > 0.0 )
-    {
-        return res->RngDistance;
-    }
-    if( fence->hasPublished != 0u )
-    {
-        return fence->publishedDistance;
-    }
-    return 0.0;
-}
-
 uint8_t RangingDisplayCanRefresh(void)
 {
     return RangingDemoDisplayUpdateAllowed() ? 1u : 0u;
 }
 
-static void RangingDisplayShowDashField(u16 x, u16 y, u16 fc, u16 bc)
-{
-    LCD_ShowString(x, y, (const u8 *)"-----", fc, bc, 12, 0);
-}
-
 static void RangingDisplayShowRunPlaceholders(void)
 {
-    LCD_ShowString(34, 36, (const u8 *)"--.--", GRAY, BLACK, 12, 0);
-    LCD_ShowString(58, 36, (const u8 *)"  ", BLACK, BLACK, 12, 0);
-    RangingDisplayShowDashField(COL_VAL_X, ROW_Y_SAMP, GRAY, BLACK);
-    RangingDisplayShowDashField(COL_VAL_X, ROW_Y_HTX, GRAY, BLACK);
-    RangingDisplayShowDashField(COL_VAL_X, ROW_Y_IS, GRAY, BLACK);
+    RangingDisplayShowDashDist(COL_VAL_X, ROW_Y_DIST, GRAY, BLACK);
+    RangingDisplayShowDashDist(COL_VAL_X, ROW_Y_RND, GRAY, BLACK);
+    RangingDisplayShowDashField(COL_VAL_X, ROW_Y_HOP, GRAY, BLACK);
+    RangingDisplayShowDashField(COL_VAL_X, ROW_Y_GATE, GRAY, BLACK);
     RangingDisplayShowRssi(COL_VAL_X, ROW_Y_RSSI, 0, GRAY, BLACK);
+    RangingDisplayShowDashField(COL_VAL_X, ROW_Y_NO, GRAY, BLACK);
+    RangingDisplayShowDashField(COL_VAL_X, ROW_Y_HTX, GRAY, BLACK);
 }
 
 static uint8_t RangingDisplayDrawValues(DemoResult_t *res, DemoSettings_t *cfg, uint8_t force)
 {
     uint8_t showStatus;
-    uint16_t handshakeTx;
-    uint16_t internalState;
-    uint16_t sampleCount;
-    int8_t rssi;
-    double distance;
+    u16 gateColor;
+    const RangingPublish_t *pub;
 
     if( ( force == 0u ) && ( RangingDisplayCanRefresh() == 0u ) )
     {
@@ -290,8 +287,9 @@ static uint8_t RangingDisplayDrawValues(DemoResult_t *res, DemoSettings_t *cfg, 
     }
 
     showStatus = RangingDisplayResolveStatus(cfg->RngStatus, res);
+    pub = RangingPublishGet();
 
-    RangingDisplayShowStatusFixed(34, 18, RangingDisplayStatusText(showStatus), YELLOW, BLACK);
+    RangingDisplayShowStatusFixed(COL_VAL_X, ROW_Y_STAT, RangingDisplayStatusText(showStatus), YELLOW, BLACK);
 
     if( showStatus == RNG_PROCESS )
     {
@@ -299,27 +297,51 @@ static uint8_t RangingDisplayDrawValues(DemoResult_t *res, DemoSettings_t *cfg, 
         return 1u;
     }
 
-    handshakeTx = RangingDisplayGetHandshakeTx(res);
-    internalState = (uint16_t)RangingDemoGetInternalState();
-    sampleCount = (uint16_t)res->CntPacketRxOK;
-    rssi = RangingDisplayGetRssi(res);
-    distance = RangingDisplayPickDistance( res, showStatus );
-
-    if (distance > 0.0)
+    if( pub->round_index > 0u )
     {
-        RangingDisplayShowDistance(34, 36, (float)distance, GREEN, BLACK);
-        LCD_ShowString(58, 36, (const u8 *)"m", CYAN, BLACK, 12, 0);
+        if( showStatus == RNG_DISPLAY_HOLD )
+        {
+            gateColor = RED;
+        }
+        else if( pub->gate_reason != RNG_FENCE_GATE_OK )
+        {
+            gateColor = YELLOW;
+        }
+        else
+        {
+            gateColor = CYAN;
+        }
+
+        if( pub->distance_m > 0.0f )
+        {
+            RangingDisplayShowDistance(COL_VAL_X, ROW_Y_DIST, pub->distance_m, GREEN, BLACK);
+        }
+        else
+        {
+            RangingDisplayShowDashDist(COL_VAL_X, ROW_Y_DIST, GRAY, BLACK);
+        }
+
+        if( pub->round_distance_m > 0.0f )
+        {
+            RangingDisplayShowDistance(COL_VAL_X, ROW_Y_RND, pub->round_distance_m, WHITE, BLACK);
+        }
+        else
+        {
+            RangingDisplayShowDashDist(COL_VAL_X, ROW_Y_RND, GRAY, BLACK);
+        }
+
+        RangingDisplayShowU16(COL_VAL_X, ROW_Y_HOP, pub->sample_count, 2u, CYAN, BLACK);
+        RangingDisplayShowGate(COL_VAL_X, ROW_Y_GATE, pub->gate_reason, gateColor, BLACK);
+        RangingDisplayShowRssi(COL_VAL_X, ROW_Y_RSSI, pub->rssi_dbm, WHITE, BLACK);
+        RangingDisplayShowU16(COL_VAL_X, ROW_Y_NO, (uint16_t)pub->round_index, 4u, GRAY, BLACK);
+        RangingDisplayShowU16(COL_VAL_X, ROW_Y_HTX, pub->handshake_tx, 3u, GRAY, BLACK);
     }
     else
     {
-        LCD_ShowString(34, 36, (const u8 *)"--.--", GRAY, BLACK, 12, 0);
-        LCD_ShowString(58, 36, (const u8 *)"  ", BLACK, BLACK, 12, 0);
+        RangingDisplayShowRunPlaceholders();
     }
 
-    RangingDisplayShowU16(COL_VAL_X, ROW_Y_SAMP, sampleCount, CYAN, BLACK);
-    RangingDisplayShowU16(COL_VAL_X, ROW_Y_HTX, handshakeTx, GRAY, BLACK);
-    RangingDisplayShowU16(COL_VAL_X, ROW_Y_IS, internalState, CYAN, BLACK);
-    RangingDisplayShowRssi(COL_VAL_X, ROW_Y_RSSI, rssi, WHITE, BLACK);
+    (void)res;
     return 1u;
 }
 
@@ -331,13 +353,15 @@ void RangingDisplayInit(void)
     LCD_Init();
     LCD_SetInitMode( 1u );
     LCD_Fill(0, 0, LCD_W, LCD_H, BLACK);
-    LCD_ShowString(2, 2, (const u8 *)"Ranging", WHITE, BLACK, 12, 0);
-    LCD_ShowString(2, 18, (const u8 *)"Stat:", GRAY, BLACK, 12, 0);
-    LCD_ShowString(2, 34, (const u8 *)"Dist:", WHITE, BLACK, 12, 0);
-    LCD_ShowString(2, 72, (const u8 *)"Samp:", GRAY, BLACK, 12, 0);
-    LCD_ShowString(2, 104, (const u8 *)"Htx:", GRAY, BLACK, 12, 0);
-    LCD_ShowString(2, 120, (const u8 *)"IS:", GRAY, BLACK, 12, 0);
-    LCD_ShowString(2, 136, (const u8 *)"RSSI:", GRAY, BLACK, 12, 0);
+    LCD_ShowString(COL_LBL_X, 2, (const u8 *)"Ranging", WHITE, BLACK, 12, 0);
+    LCD_ShowString(COL_LBL_X, ROW_Y_STAT, (const u8 *)"Stat:", GRAY, BLACK, 12, 0);
+    LCD_ShowString(COL_LBL_X, ROW_Y_DIST, (const u8 *)"Dist:", WHITE, BLACK, 12, 0);
+    LCD_ShowString(COL_LBL_X, ROW_Y_RND, (const u8 *)"Rnd:", GRAY, BLACK, 12, 0);
+    LCD_ShowString(COL_LBL_X, ROW_Y_HOP, (const u8 *)"Hop:", GRAY, BLACK, 12, 0);
+    LCD_ShowString(COL_LBL_X, ROW_Y_GATE, (const u8 *)"Gate:", GRAY, BLACK, 12, 0);
+    LCD_ShowString(COL_LBL_X, ROW_Y_RSSI, (const u8 *)"RSSI:", GRAY, BLACK, 12, 0);
+    LCD_ShowString(COL_LBL_X, ROW_Y_NO, (const u8 *)"No:", GRAY, BLACK, 12, 0);
+    LCD_ShowString(COL_LBL_X, ROW_Y_HTX, (const u8 *)"Htx:", GRAY, BLACK, 12, 0);
     LCD_SetInitMode( 0u );
 
     RangingDisplayDrawValues(res, cfg, 1u);
