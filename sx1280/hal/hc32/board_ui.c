@@ -239,3 +239,34 @@ void BoardUiPlayRangingCompleteAlert(void)
         }
     }
 }
+
+void BoardUiBuzzerSet(uint8_t on)
+{
+    if( on != 0u )
+    {
+        BoardUiBuzzerOn();
+    }
+    else
+    {
+        BoardUiBuzzerOff();
+    }
+}
+
+void BoardUiLedSet(uint8_t on)
+{
+    if( on != 0u )
+    {
+        STK_LED_ON();
+    }
+    else
+    {
+        STK_LED_OFF();
+    }
+}
+
+void BoardUiPlayKeyClick(void)
+{
+    BoardUiBuzzerOn();
+    DDL_Delay1ms( 40u );
+    BoardUiBuzzerOff();
+}

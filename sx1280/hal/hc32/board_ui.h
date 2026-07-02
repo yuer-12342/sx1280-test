@@ -27,5 +27,8 @@ void BoardUiArmRanging(void);
 void BoardUiDisarmRanging(void);
 uint8_t BoardUiIsRangingArmed(void);
 void BoardUiPlayRangingCompleteAlert(void);
+void BoardUiBuzzerSet(uint8_t on);
+void BoardUiLedSet(uint8_t on);
+void BoardUiPlayKeyClick(void);
 
 #endif

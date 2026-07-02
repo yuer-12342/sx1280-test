@@ -6,7 +6,7 @@
 /*
  * 标定/阶段 A：轮末快照，Keil Watch 读 g_RangingDevLog。
  * validity: 0=INV 1=OK 2=HOLD 3=RAW
- * gate:     0=OK 1=INV_STATUS 2=LOW_SAMPLES 3=BAD_RSSI 4=HIGH_SPREAD 5=JUMP
+ * gate:     0=OK 1=INV_STATUS 2=LOW_SAMPLES 3=BAD_RSSI 4=HIGH_SPREAD 5=JUMP 6=PUB_RND_DELTA
  */
 typedef struct
 {

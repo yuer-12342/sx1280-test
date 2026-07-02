@@ -31,6 +31,7 @@
 #include "board_ui.h"
 #include "spi_mutex.h"
 #include "sx1280_hal_hc32.h"
+#include "timer_hc32.h"
 #if( DEMO_FREQ_HOPPED_RANGING == 1 )
 #include "FreqLUT.h"
 #endif
@@ -250,6 +251,7 @@ static uint32_t s_slaveLastRxOkCount = 0u;
 static uint16_t s_hopsSinceLastSuccess = 0u;
 static uint8_t  s_rngSessionId = 0u;
 static uint8_t  s_operatingMode = RNG_OP_MODE_DEMO;
+static void ( *s_idleHook )( void ) = NULL;
 static uint8_t  s_quickSessionStarted = 0u;
 static uint8_t  s_masterHandshakeFails = 0u;
 
@@ -303,6 +305,7 @@ static void RangingDemoTerminateSession( void );
 static void RangingDemoMasterHandshakeFailed( void );
 static uint16_t RangingDemoGetSlaveIdleThreshold( void );
 static uint8_t RangingDemoSlaveTryHandshake( void );
+static void RangingDemoDelayMs( uint32_t delayMs );
 
 /*!
  * \brief Callback of ticker PerSendNextPacket
@@ -1000,12 +1003,12 @@ void RangingDemoReset( void )
     {
         if( s_quickSessionStarted != 0u )
         {
-            HAL_Delay( RNG_CONTINUOUS_SESSION_GAP_MS );
+            RangingDemoDelayMs( RNG_CONTINUOUS_SESSION_GAP_MS );
         }
     }
     else
     {
-        HAL_Delay( MASTER_SLAVE_RESYNC_DELAY_MS );
+        RangingDemoDelayMs( MASTER_SLAVE_RESYNC_DELAY_MS );
     }
     s_rngSessionId++;
     SendNext                        = false;
@@ -1026,6 +1029,27 @@ void RangingDemoReset( void )
     currentChannel                  = 0u;
     s_hopsSinceLastSuccess          = 0u;
     s_masterHandshakeFails          = 0u;
+}
+
+void RangingDemoSetIdleHook( void ( *hook )( void ) )
+{
+    s_idleHook = hook;
+}
+
+static void RangingDemoDelayMs( uint32_t delayMs )
+{
+    uint32_t start;
+    uint32_t now;
+
+    start = TimerGetTickMs();
+    do
+    {
+        if( s_idleHook != NULL )
+        {
+            s_idleHook();
+        }
+        now = TimerGetTickMs();
+    } while( ( now - start ) < delayMs );
 }
 
 void RangingDemoSetContinuousMode( uint8_t enable )

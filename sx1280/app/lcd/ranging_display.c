@@ -3,6 +3,7 @@
 #include "demoRanging.h"
 #include "ranging_fence.h"
 #include "ranging_publish.h"
+#include "fence_alarm.h"
 
 #define RNG_DISPLAY_HOLD    250u
 #define RNG_DISPLAY_RAW     251u
@@ -19,8 +20,8 @@
 #define ROW_Y_HOP           66u
 #define ROW_Y_GATE          82u
 #define ROW_Y_RSSI          98u
-#define ROW_Y_NO            114u
-#define ROW_Y_HTX           130u
+#define ROW_Y_SET           114u
+#define ROW_Y_ALM           130u
 
 static const u8 *RangingDisplayStatusText(uint8_t status)
 {
@@ -171,6 +172,8 @@ static const u8 *RangingDisplayGateText( RangingFenceGateReason_t reason )
         return (const u8 *)"Sprd";
     case RNG_FENCE_GATE_JUMP:
         return (const u8 *)"Jump";
+    case RNG_FENCE_GATE_PUB_RND_DELTA:
+        return (const u8 *)"dRnd";
     default:
         return (const u8 *)"??? ";
     }
@@ -264,6 +267,24 @@ uint8_t RangingDisplayCanRefresh(void)
     return RangingDemoDisplayUpdateAllowed() ? 1u : 0u;
 }
 
+static void RangingDisplayShowAlmState(u16 x, u16 y, u16 fc, u16 bc)
+{
+    if( FenceAlarmIsEnabled() == 0u )
+    {
+        RangingDisplayShowStatusFixed( x, y, (const u8 *)"Mute", GRAY, bc );
+        return;
+    }
+
+    if( FenceAlarmGetState() == FENCE_ALARM_STATE_OUT )
+    {
+        RangingDisplayShowStatusFixed( x, y, (const u8 *)"OUT!", RED, bc );
+    }
+    else
+    {
+        RangingDisplayShowStatusFixed( x, y, (const u8 *)"Safe", GREEN, bc );
+    }
+}
+
 static void RangingDisplayShowRunPlaceholders(void)
 {
     RangingDisplayShowDashDist(COL_VAL_X, ROW_Y_DIST, GRAY, BLACK);
@@ -271,8 +292,8 @@ static void RangingDisplayShowRunPlaceholders(void)
     RangingDisplayShowDashField(COL_VAL_X, ROW_Y_HOP, GRAY, BLACK);
     RangingDisplayShowDashField(COL_VAL_X, ROW_Y_GATE, GRAY, BLACK);
     RangingDisplayShowRssi(COL_VAL_X, ROW_Y_RSSI, 0, GRAY, BLACK);
-    RangingDisplayShowDashField(COL_VAL_X, ROW_Y_NO, GRAY, BLACK);
-    RangingDisplayShowDashField(COL_VAL_X, ROW_Y_HTX, GRAY, BLACK);
+    RangingDisplayShowDistance(COL_VAL_X, ROW_Y_SET, FenceAlarmGetThresholdM(), YELLOW, BLACK);
+    RangingDisplayShowAlmState(COL_VAL_X, ROW_Y_ALM, GRAY, BLACK);
 }
 
 static uint8_t RangingDisplayDrawValues(DemoResult_t *res, DemoSettings_t *cfg, uint8_t force)
@@ -333,8 +354,8 @@ static uint8_t RangingDisplayDrawValues(DemoResult_t *res, DemoSettings_t *cfg, 
         RangingDisplayShowU16(COL_VAL_X, ROW_Y_HOP, pub->sample_count, 2u, CYAN, BLACK);
         RangingDisplayShowGate(COL_VAL_X, ROW_Y_GATE, pub->gate_reason, gateColor, BLACK);
         RangingDisplayShowRssi(COL_VAL_X, ROW_Y_RSSI, pub->rssi_dbm, WHITE, BLACK);
-        RangingDisplayShowU16(COL_VAL_X, ROW_Y_NO, (uint16_t)pub->round_index, 4u, GRAY, BLACK);
-        RangingDisplayShowU16(COL_VAL_X, ROW_Y_HTX, pub->handshake_tx, 3u, GRAY, BLACK);
+        RangingDisplayShowDistance(COL_VAL_X, ROW_Y_SET, FenceAlarmGetThresholdM(), YELLOW, BLACK);
+        RangingDisplayShowAlmState(COL_VAL_X, ROW_Y_ALM, WHITE, BLACK);
     }
     else
     {
@@ -353,15 +374,15 @@ void RangingDisplayInit(void)
     LCD_Init();
     LCD_SetInitMode( 1u );
     LCD_Fill(0, 0, LCD_W, LCD_H, BLACK);
-    LCD_ShowString(COL_LBL_X, 2, (const u8 *)"Ranging", WHITE, BLACK, 12, 0);
+    LCD_ShowString(COL_LBL_X, 2, (const u8 *)"Fence", WHITE, BLACK, 12, 0);
     LCD_ShowString(COL_LBL_X, ROW_Y_STAT, (const u8 *)"Stat:", GRAY, BLACK, 12, 0);
     LCD_ShowString(COL_LBL_X, ROW_Y_DIST, (const u8 *)"Dist:", WHITE, BLACK, 12, 0);
     LCD_ShowString(COL_LBL_X, ROW_Y_RND, (const u8 *)"Rnd:", GRAY, BLACK, 12, 0);
     LCD_ShowString(COL_LBL_X, ROW_Y_HOP, (const u8 *)"Hop:", GRAY, BLACK, 12, 0);
     LCD_ShowString(COL_LBL_X, ROW_Y_GATE, (const u8 *)"Gate:", GRAY, BLACK, 12, 0);
     LCD_ShowString(COL_LBL_X, ROW_Y_RSSI, (const u8 *)"RSSI:", GRAY, BLACK, 12, 0);
-    LCD_ShowString(COL_LBL_X, ROW_Y_NO, (const u8 *)"No:", GRAY, BLACK, 12, 0);
-    LCD_ShowString(COL_LBL_X, ROW_Y_HTX, (const u8 *)"Htx:", GRAY, BLACK, 12, 0);
+    LCD_ShowString(COL_LBL_X, ROW_Y_SET, (const u8 *)"Set:", YELLOW, BLACK, 12, 0);
+    LCD_ShowString(COL_LBL_X, ROW_Y_ALM, (const u8 *)"Alm:", GRAY, BLACK, 12, 0);
     LCD_SetInitMode( 0u );
 
     RangingDisplayDrawValues(res, cfg, 1u);
@@ -414,4 +435,10 @@ void RangingDisplayForceUpdate(void)
     }
 
     RangingDisplayDrawValues(res, cfg, 1u);
+}
+
+void RangingDisplayRefreshFenceFields(void)
+{
+    RangingDisplayShowDistance(COL_VAL_X, ROW_Y_SET, FenceAlarmGetThresholdM(), YELLOW, BLACK);
+    RangingDisplayShowAlmState(COL_VAL_X, ROW_Y_ALM, WHITE, BLACK);
 }

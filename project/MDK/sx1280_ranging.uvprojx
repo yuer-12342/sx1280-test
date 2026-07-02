@@ -634,6 +634,16 @@
               <FilePath>..\..\sx1280\app\ranging\ranging_dev_log.h</FilePath>
             </File>
             <File>
+              <FileName>fence_alarm.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\sx1280\app\ranging\fence_alarm.c</FilePath>
+            </File>
+            <File>
+              <FileName>fence_alarm.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\sx1280\app\ranging\fence_alarm.h</FilePath>
+            </File>
+            <File>
               <FileName>FreqLUT.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\..\sx1280\app\ranging\FreqLUT.h</FilePath>

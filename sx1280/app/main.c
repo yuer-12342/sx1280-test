@@ -6,6 +6,8 @@
 #include "ranging_fence.h"
 #include "ranging_publish.h"
 #include "ranging_dev_log.h"
+#include "fence_alarm.h"
+#include "timer_hc32.h"
 
 /*
  * 烧录前修改 DEMO_SETTING_ENTITY 为 DEMO_ROLE_MASTER 或 DEMO_ROLE_SLAVE。
@@ -14,7 +16,7 @@
  * DEMO_RNG_CONTINUOUS_MODE=0：按键触发 demo（30 样本/轮）。
  *
  * MASTER/SLAVE 共用：InitApplication、continuous 参数、SetRadioParameters（SF7+BW800）。
- * 标定 Watch：g_RangingDevLog（validity / gate / round_m / distance_m / rssi）。
+ * 围栏 DEMO（仅 MASTER）：短按松手切换 Set(3/5/10/15m)，长按 1s 静音；轮间 1s 也可按键。
  */
 
 #define DEMO_ROLE_MASTER  0
@@ -26,7 +28,7 @@
 #define DEMO_RNG_CONTINUOUS_MODE  1
 
 #if ( DEMO_SETTING_ENTITY == DEMO_ROLE_MASTER )
-#define DEMO_USE_TFT  1
+#define DEMO_USE_TFT  0   /* 1=启用 TFT；屏坏时置 0，测距/门控/蜂鸣仍运行 */
 #else
 #define DEMO_USE_TFT  0
 #endif
@@ -54,8 +56,33 @@ static void RangingAppProcessRound(void)
     RangingFenceProcessRound( roundResult, RangingDemoGetConfiguration() );
     RangingPublishUpdateFromRound( roundResult, RangingDemoGetConfiguration() );
     RangingDevLogUpdate();
+    FenceAlarmOnRound();
 }
 #endif
+
+static void RangingAppPollUi(void)
+{
+#if ( DEMO_SETTING_ENTITY == DEMO_ROLE_MASTER )
+    FenceAlarmPollInput();
+    FenceAlarmPollOutput();
+#if ( DEMO_USE_TFT == 1 )
+    if( FenceAlarmTakeUiDirty() != 0u )
+    {
+        RangingDisplayRefreshFenceFields();
+    }
+#endif
+#endif
+}
+
+static void RangingAppBootDelayMs(uint32_t delayMs)
+{
+    uint32_t start = TimerGetTickMs();
+
+    while( ( TimerGetTickMs() - start ) < delayMs )
+    {
+        RangingAppPollUi();
+    }
+}
 
 int main(void)
 {
@@ -81,6 +108,8 @@ int main(void)
 
 #if ( DEMO_SETTING_ENTITY == DEMO_ROLE_MASTER )
     BoardUiInit();
+    FenceAlarmInit();
+    RangingDemoSetIdleHook( RangingAppPollUi );
 #endif
 
 #if ( DEMO_USE_TFT == 1 )
@@ -91,7 +120,7 @@ int main(void)
     Radio.Reset();
 
 #if ( DEMO_SETTING_ENTITY == DEMO_ROLE_MASTER )
-    HAL_Delay(3000);
+    RangingAppBootDelayMs( 3000u );
 #endif
 
 #if ( DEMO_SETTING_ENTITY == DEMO_ROLE_SLAVE )
@@ -120,9 +149,11 @@ int main(void)
             RangingDemoPollRadio();
             RangingDisplayUpdate();
 #endif
+            RangingAppPollUi();
         } while( demoStatus == DEMO_RANGING_RUNNING );
 
         RangingAppProcessRound();
+        RangingAppPollUi();
 
 #if ( DEMO_USE_TFT == 1 )
         RangingDisplayForceUpdate();

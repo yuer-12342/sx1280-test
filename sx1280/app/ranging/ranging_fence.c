@@ -151,14 +151,26 @@ static RangingFenceGateReason_t RangingFenceEvaluateGate( DemoResult_t *res, Dem
         ( res->RngDistance > 0.0 ) &&
         ( s_fence.publishedDistance > 0.0 ) )
     {
-        double jump = res->RngDistance - s_fence.publishedDistance;
-        if( jump < 0.0 )
-        {
-            jump = -jump;
-        }
-        if( jump > FENCE_GATE_MAX_JUMP_M )
+        double delta = res->RngDistance - s_fence.publishedDistance;
+        double absDelta;
+
+        if( delta > ( double )FENCE_GATE_MAX_JUMP_UP_M )
         {
             return RNG_FENCE_GATE_JUMP;
+        }
+        if( delta < -( double )FENCE_GATE_MAX_JUMP_DOWN_M )
+        {
+            return RNG_FENCE_GATE_JUMP;
+        }
+
+        absDelta = delta;
+        if( absDelta < 0.0 )
+        {
+            absDelta = -absDelta;
+        }
+        if( absDelta > ( double )FENCE_GATE_MAX_PUB_RND_DELTA_M )
+        {
+            return RNG_FENCE_GATE_PUB_RND_DELTA;
         }
     }
 

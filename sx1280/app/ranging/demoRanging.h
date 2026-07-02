@@ -275,6 +275,11 @@ void RangingDemoPollRadio( void );
 uint8_t RangingDemoDisplayUpdateAllowed( void );
 DemoResult_t* RangingDemoGetResultForDisplay( void );
 uint8_t RangingDemoHasLiveSamples( void );
+
+/*!
+ * \brief Hook polled every 1 ms during session gap delays (keys / UI).
+ */
+void RangingDemoSetIdleHook( void ( *hook )( void ) );
 uint8_t RangingDemoGetInternalState( void );
 uint8_t RangingDemoIsContinuousMode( void );
 

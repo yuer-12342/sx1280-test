@@ -3,10 +3,13 @@
 
 #include "demoRanging.h"
 
-/* 门控：样本数 >= ceil(RngRequestCount/2)；RSSI / 离散度 / 跳变 */
+/* 门控：样本数 >= ceil(RngRequestCount/2)；RSSI / 离散度 / 跳变 / Rnd-Dist 偏差 */
 #define FENCE_GATE_MIN_RSSI_DBM           (-92)
 #define FENCE_GATE_MAX_RAW_SPREAD_RATIO   0.50f
-#define FENCE_GATE_MAX_JUMP_M             4.0
+#define FENCE_GATE_MAX_JUMP_UP_M          4.0f
+#define FENCE_GATE_MAX_JUMP_DOWN_M        1.5f
+#define FENCE_GATE_MAX_PUB_RND_DELTA_M    0.8f
+#define FENCE_GATE_MAX_JUMP_M             FENCE_GATE_MAX_JUMP_UP_M
 
 /* 轮间滤波：最近 N 轮通过门控的距离取中值 */
 #define FENCE_FILTER_WINDOW               3u
@@ -19,6 +22,7 @@ typedef enum
     RNG_FENCE_GATE_BAD_RSSI,
     RNG_FENCE_GATE_HIGH_SPREAD,
     RNG_FENCE_GATE_JUMP,
+    RNG_FENCE_GATE_PUB_RND_DELTA,
 } RangingFenceGateReason_t;
 
 typedef struct
