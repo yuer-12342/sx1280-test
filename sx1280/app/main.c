@@ -48,7 +48,7 @@ static void RangingDemoKeyWaitIdle(void)
 }
 #endif
 
-#if ( DEMO_SETTING_ENTITY == DEMO_ROLE_MASTER )
+#if ( DEMO_SETTING_ENTITY == DEMO_ROLE_MASTER )  //主机模式
 static void RangingAppProcessRound(void)
 {
     DemoResult_t *roundResult = RangingDemoGetResult();      //获取原始值
