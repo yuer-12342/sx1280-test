@@ -141,9 +141,9 @@ void LCD_Address_Set(u16 x1, u16 y1, u16 x2, u16 y2)
 
     LCD_WR_REG(0x2B);
     LCD_WR_DATA8(0x00);
-    LCD_WR_DATA8((u8)y1);
+    LCD_WR_DATA8((u8)(y1 + LCD_ROW_OFFSET));
     LCD_WR_DATA8(0x00);
-    LCD_WR_DATA8((u8)y2);
+    LCD_WR_DATA8((u8)(y2 + LCD_ROW_OFFSET));
 
     LCD_WR_REG(0x2C);
 }
@@ -153,14 +153,13 @@ void LCD_Init(void)
     LCD_GPIO_Init();
     LCD_SetInitMode( 1u );
 
-    LCD_BLK_Set();
-
-    LCD_RES_Set();
-    DDL_Delay1ms(10);
     LCD_RES_Clr();
-    DDL_Delay1ms(10);
+    DDL_Delay1ms(100);
     LCD_RES_Set();
-    DDL_Delay1ms(10);
+    DDL_Delay1ms(100);
+
+    LCD_BLK_Set();
+    DDL_Delay1ms(100);
 
     LCD_WR_REG(0x11);
     DDL_Delay1ms(120);
@@ -187,12 +186,12 @@ void LCD_Init(void)
     LCD_WR_DATA8(0x03);
 
     LCD_WR_REG(0xC0);
-    LCD_WR_DATA8(0x0E);
-    LCD_WR_DATA8(0x0E);
+    LCD_WR_DATA8(0xAB);
+    LCD_WR_DATA8(0x0B);
     LCD_WR_DATA8(0x04);
 
     LCD_WR_REG(0xC1);
-    LCD_WR_DATA8(0xC0);
+    LCD_WR_DATA8(0xC5);
 
     LCD_WR_REG(0xC2);
     LCD_WR_DATA8(0x0D);
@@ -200,57 +199,61 @@ void LCD_Init(void)
 
     LCD_WR_REG(0xC3);
     LCD_WR_DATA8(0x8D);
-    LCD_WR_DATA8(0x2A);
+    LCD_WR_DATA8(0x6A);
 
     LCD_WR_REG(0xC4);
     LCD_WR_DATA8(0x8D);
     LCD_WR_DATA8(0xEE);
 
     LCD_WR_REG(0xC5);
-    LCD_WR_DATA8(0x04);
+    LCD_WR_DATA8(0x0F);
 
-    LCD_WR_REG(0x36);
+    LCD_WR_REG(0xE0);
+    LCD_WR_DATA8(0x07);
+    LCD_WR_DATA8(0x0E);
     LCD_WR_DATA8(0x08);
+    LCD_WR_DATA8(0x07);
+    LCD_WR_DATA8(0x10);
+    LCD_WR_DATA8(0x07);
+    LCD_WR_DATA8(0x02);
+    LCD_WR_DATA8(0x07);
+    LCD_WR_DATA8(0x09);
+    LCD_WR_DATA8(0x0F);
+    LCD_WR_DATA8(0x25);
+    LCD_WR_DATA8(0x36);
+    LCD_WR_DATA8(0x00);
+    LCD_WR_DATA8(0x08);
+    LCD_WR_DATA8(0x04);
+    LCD_WR_DATA8(0x10);
+
+    LCD_WR_REG(0xE1);
+    LCD_WR_DATA8(0x0A);
+    LCD_WR_DATA8(0x0D);
+    LCD_WR_DATA8(0x08);
+    LCD_WR_DATA8(0x07);
+    LCD_WR_DATA8(0x0F);
+    LCD_WR_DATA8(0x07);
+    LCD_WR_DATA8(0x02);
+    LCD_WR_DATA8(0x07);
+    LCD_WR_DATA8(0x09);
+    LCD_WR_DATA8(0x0F);
+    LCD_WR_DATA8(0x25);
+    LCD_WR_DATA8(0x35);
+    LCD_WR_DATA8(0x00);
+    LCD_WR_DATA8(0x09);
+    LCD_WR_DATA8(0x04);
+    LCD_WR_DATA8(0x10);
+
+    LCD_WR_REG(0xFC);
+    LCD_WR_DATA8(0x80);
 
     LCD_WR_REG(0x3A);
     LCD_WR_DATA8(0x05);
 
-    LCD_WR_REG(0xE0);
-    LCD_WR_DATA8(0x05);
-    LCD_WR_DATA8(0x1A);
-    LCD_WR_DATA8(0x0B);
-    LCD_WR_DATA8(0x15);
-    LCD_WR_DATA8(0x3D);
-    LCD_WR_DATA8(0x38);
-    LCD_WR_DATA8(0x2E);
-    LCD_WR_DATA8(0x30);
-    LCD_WR_DATA8(0x2D);
-    LCD_WR_DATA8(0x28);
-    LCD_WR_DATA8(0x30);
-    LCD_WR_DATA8(0x3B);
-    LCD_WR_DATA8(0x00);
-    LCD_WR_DATA8(0x01);
-    LCD_WR_DATA8(0x02);
-    LCD_WR_DATA8(0x10);
+    LCD_WR_REG(0x36);
+    LCD_WR_DATA8(0x08);
 
-    LCD_WR_REG(0xE1);
-    LCD_WR_DATA8(0x05);
-    LCD_WR_DATA8(0x1A);
-    LCD_WR_DATA8(0x0B);
-    LCD_WR_DATA8(0x15);
-    LCD_WR_DATA8(0x36);
-    LCD_WR_DATA8(0x2E);
-    LCD_WR_DATA8(0x28);
-    LCD_WR_DATA8(0x2B);
-    LCD_WR_DATA8(0x2B);
-    LCD_WR_DATA8(0x28);
-    LCD_WR_DATA8(0x30);
-    LCD_WR_DATA8(0x3B);
-    LCD_WR_DATA8(0x00);
-    LCD_WR_DATA8(0x01);
-    LCD_WR_DATA8(0x02);
-    LCD_WR_DATA8(0x10);
-
+    LCD_WR_REG(0x21);
     LCD_WR_REG(0x29);
 
     LCD_SetInitMode( 0u );

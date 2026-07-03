@@ -10,9 +10,10 @@ typedef uint8_t  u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 
-/* 竖屏 80x160，与 Initial_ST7735 / address() 一致 */
+/* 0.96IPS 瀚彩 ST7735S 竖屏 80x160（tft无排针 资料） */
 #define USE_HORIZONTAL      0
-#define LCD_COL_OFFSET      24
+#define LCD_COL_OFFSET      26
+#define LCD_ROW_OFFSET      1
 
 #define LCD_W               80
 #define LCD_H               160

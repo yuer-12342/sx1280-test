@@ -5,7 +5,7 @@ static double s_filterWindow[FENCE_FILTER_WINDOW];
 static uint8_t s_filterCount;
 static uint8_t s_filterWriteIdx;
 
-static int8_t RangingFencePickRssi( DemoResult_t *res )
+static int8_t RangingFencePickRssi( DemoResult_t *res )     //RSSI信号检查
 {
     int8_t rssi;
     uint16_t i;
@@ -25,7 +25,7 @@ static int8_t RangingFencePickRssi( DemoResult_t *res )
     return res->RssiValue;
 }
 
-static double RangingFenceMedian( double *values, uint8_t count )
+static double RangingFenceMedian( double *values, uint8_t count )   //中位数计算
 {
     double sorted[FENCE_FILTER_WINDOW];
     uint8_t i;
@@ -42,11 +42,11 @@ static double RangingFenceMedian( double *values, uint8_t count )
         sorted[i] = values[i];
     }
 
-    for( pass = 0u; pass < ( count - 1u ); ++pass )
+    for( pass = 0u; pass < ( count - 1u ); ++pass )    //冒泡排序取中位数
     {
         for( k = 0u; k < ( count - 1u - pass ); ++k )
         {
-            if( sorted[k] > sorted[k + 1u] )
+            if( sorted[k] > sorted[k + 1u] )          
             {
                 double temp = sorted[k];
                 sorted[k] = sorted[k + 1u];
@@ -55,7 +55,7 @@ static double RangingFenceMedian( double *values, uint8_t count )
         }
     }
 
-    if( ( count % 2u ) == 0u )
+    if( ( count % 2u ) == 0u )        //如果是偶数个则取中间两个平均值，奇数个数据则取中间那个
     {
         return ( sorted[count / 2u - 1u] + sorted[count / 2u] ) * 0.5;
     }
@@ -71,9 +71,9 @@ static uint8_t RangingFenceCheckRawSpread( DemoResult_t *res )
     double spread;
     uint16_t i;
 
-    if( res->RngResultIndex < 3 )
+    if( res->RngResultIndex < 3 )   //只有达到3个Hop才能计算离散度
     {
-        return 1u;
+        return 1u;                   //样本数太少
     }
 
     minVal = res->RngResults[0];
@@ -90,13 +90,13 @@ static uint8_t RangingFenceCheckRawSpread( DemoResult_t *res )
         }
     }
 
-    median = ( maxVal + minVal ) * 0.5;
+    median = ( maxVal + minVal ) * 0.5;    //最大+最小/2  ，作为中位数近似
     if( median <= 0.0 )
     {
         return 1u;
     }
 
-    spread = ( maxVal - minVal ) / median;
+    spread = ( maxVal - minVal ) / median;      //离散度计算
     if( spread > ( double )FENCE_GATE_MAX_RAW_SPREAD_RATIO )
     {
         return 0u;
@@ -120,34 +120,34 @@ static RangingFenceGateReason_t RangingFenceEvaluateGate( DemoResult_t *res, Dem
     int8_t rssi;
     uint8_t minSamples;
 
-    if( cfg->RngStatus != RNG_VALID )
+    if( cfg->RngStatus != RNG_VALID )   //芯片状态检查
     {
         return RNG_FENCE_GATE_INVALID_STATUS;
     }
 
-    if( res->RngDistance <= 0.0 )
+    if( res->RngDistance <= 0.0 )      //距离有效性检查
     {
         return RNG_FENCE_GATE_INVALID_STATUS;
     }
 
-    minSamples = RangingFenceGetMinSamples( cfg );
+    minSamples = RangingFenceGetMinSamples( cfg );      //样本数检查
     if( ( uint8_t )res->RngResultIndex < minSamples )
     {
         return RNG_FENCE_GATE_LOW_SAMPLES;
     }
 
-    rssi = RangingFencePickRssi( res );
+    rssi = RangingFencePickRssi( res );               //RSSI检查
     if( ( rssi != 0 ) && ( rssi < FENCE_GATE_MIN_RSSI_DBM ) )
     {
         return RNG_FENCE_GATE_BAD_RSSI;
     }
 
-    if( RangingFenceCheckRawSpread( res ) == 0u )
+    if( RangingFenceCheckRawSpread( res ) == 0u )       //hop离散度检查
     {
         return RNG_FENCE_GATE_HIGH_SPREAD;
     }
 
-    if( ( s_fence.hasPublished != 0u ) &&
+    if( ( s_fence.hasPublished != 0u ) &&       //跳变检查，向上为4米，向下1.5米
         ( res->RngDistance > 0.0 ) &&
         ( s_fence.publishedDistance > 0.0 ) )
     {
@@ -164,7 +164,7 @@ static RangingFenceGateReason_t RangingFenceEvaluateGate( DemoResult_t *res, Dem
         }
 
         absDelta = delta;
-        if( absDelta < 0.0 )
+        if( absDelta < 0.0 )       //偏差大于0.8米也拒绝
         {
             absDelta = -absDelta;
         }
@@ -177,17 +177,17 @@ static RangingFenceGateReason_t RangingFenceEvaluateGate( DemoResult_t *res, Dem
     return RNG_FENCE_GATE_OK;
 }
 
-static void RangingFencePushFilter( double distance )
+static void RangingFencePushFilter( double distance )         //循环缓冲区
 {
-    s_filterWindow[s_filterWriteIdx] = distance;
-    s_filterWriteIdx = ( uint8_t )( ( s_filterWriteIdx + 1u ) % FENCE_FILTER_WINDOW );
+    s_filterWindow[s_filterWriteIdx] = distance;             //存入新值
+    s_filterWriteIdx = ( uint8_t )( ( s_filterWriteIdx + 1u ) % FENCE_FILTER_WINDOW );    //移动指针
     if( s_filterCount < FENCE_FILTER_WINDOW )
     {
-        s_filterCount++;
+        s_filterCount++;                                   //未填满则加1
     }
 }
 
-void RangingFenceInit( void )
+void RangingFenceInit( void )      //围栏初始化
 {
     uint8_t i;
 
@@ -208,24 +208,24 @@ void RangingFenceInit( void )
     }
 }
 
-void RangingFenceProcessRound( DemoResult_t *res, DemoSettings_t *cfg )
+void RangingFenceProcessRound( DemoResult_t *res, DemoSettings_t *cfg )  
 {
-    RangingFenceGateReason_t reason;
+    RangingFenceGateReason_t reason;     //记录的本轮原始数据
 
     s_fence.roundDistance = res->RngDistance;
     s_fence.sampleCount = ( uint8_t )res->RngResultIndex;
-    s_fence.rssiDbm = RangingFencePickRssi( res );
+    s_fence.rssiDbm = RangingFencePickRssi( res );  
     s_fence.gatePassed = 0u;
 
-    reason = RangingFenceEvaluateGate( res, cfg );
+    reason = RangingFenceEvaluateGate( res, cfg );    //执行门控检查
     s_fence.gateReason = reason;
 
-    if( reason != RNG_FENCE_GATE_OK )
+    if( reason != RNG_FENCE_GATE_OK )            //不通过直接返回。publishedDistance不变
     {
         return;
     }
 
-    s_fence.gatePassed = 1u;
+    s_fence.gatePassed = 1u;              //通过、压入窗口、取中位数、更新发布值
     RangingFencePushFilter( res->RngDistance );  //
     s_fence.filteredDistance = RangingFenceMedian( s_filterWindow, s_filterCount );
     s_fence.publishedDistance = s_fence.filteredDistance;
