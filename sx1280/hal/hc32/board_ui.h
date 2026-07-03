@@ -30,5 +30,6 @@ void BoardUiPlayRangingCompleteAlert(void);
 void BoardUiBuzzerSet(uint8_t on);
 void BoardUiLedSet(uint8_t on);
 void BoardUiPlayKeyClick(void);
+void BoardUiPlayKeyLongPress(void);
 
 #endif

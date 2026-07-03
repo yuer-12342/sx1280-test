@@ -12,8 +12,10 @@
 #include "timer_hc32.h"
 
 #define FENCE_ALARM_PRESET_COUNT        4u
-#define FENCE_ALARM_KEY_LONG_MS         1000u
-#define FENCE_ALARM_KEY_MIN_MS          40u
+/* 短按：按下 ≥30 ms 且在 3 s 前松开 → 切换 Set（短促嘀一声）
+ * 长按：按住满 3 s → 开关报警（较长嘀一声），松开不再触发短按 */
+#define FENCE_ALARM_KEY_LONG_MS         3000u
+#define FENCE_ALARM_KEY_MIN_MS          30u
 #define FENCE_ALARM_BEEP_ON_MS          150u
 #define FENCE_ALARM_BEEP_OFF_MS         850u
 
@@ -170,7 +172,7 @@ static void FenceAlarmToggleEnabled( void )
         BoardUiLedSet( 0u );
     }
     s_uiDirty = 1u;
-    BoardUiPlayKeyClick( );
+    BoardUiPlayKeyLongPress( );
 }
 
 void FenceAlarmPollInput( void )

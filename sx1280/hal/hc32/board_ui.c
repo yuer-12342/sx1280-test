@@ -270,3 +270,10 @@ void BoardUiPlayKeyClick(void)
     DDL_Delay1ms( 40u );
     BoardUiBuzzerOff();
 }
+
+void BoardUiPlayKeyLongPress(void)
+{
+    BoardUiBuzzerOn();
+    DDL_Delay1ms( 120u );
+    BoardUiBuzzerOff();
+}
