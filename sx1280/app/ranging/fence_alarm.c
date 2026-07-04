@@ -1,9 +1,15 @@
 /*
- * 室内粗测：Set 默认 0.6 m，用 Rnd 判距，Hold 也计数，连续 2 轮触发。
- * 仅改此处并 Rebuild 即可切换。
+ * 稳定判区户外版（默认）：
+ *   FENCE_ALARM_USE_RND=1      报警用 Rnd，Hold 也计数
+ *   FENCE_ALARM_INDOOR_DEMO=0  Set 3/5/10/15，默认 5，3 轮触发，滞回 1 m
+ * 室内快验：FENCE_ALARM_INDOOR_DEMO=1（Set 0.6～1.5，2 轮触发）
+ * 恢复 Dist 报警：FENCE_ALARM_USE_RND=0
  */
+#ifndef FENCE_ALARM_USE_RND
+#define FENCE_ALARM_USE_RND          1
+#endif
 #ifndef FENCE_ALARM_INDOOR_DEMO
-#define FENCE_ALARM_INDOOR_DEMO  0
+#define FENCE_ALARM_INDOOR_DEMO      0
 #endif
 
 #include "fence_alarm.h"
@@ -66,7 +72,7 @@ static float FenceAlarmGetClearThresholdM( void )
     return clearM;
 }
 
-#if ( FENCE_ALARM_INDOOR_DEMO != 0 )
+#if ( FENCE_ALARM_USE_RND != 0 )
 static uint8_t FenceAlarmPickDistanceM( const RangingPublish_t *pub, float *distanceM )
 {
     if( pub->validity == RNG_PUBLISH_INVALID )
