@@ -5,7 +5,10 @@ static double s_filterWindow[FENCE_FILTER_WINDOW];
 static uint8_t s_filterCount;
 static uint8_t s_filterWriteIdx;
 
-static int8_t RangingFencePickRssi( DemoResult_t *res )     //RSSI信号检查
+static double s_trendRnd[FENCE_TREND_WINDOW];
+static uint8_t s_trendCount;
+
+static int8_t RangingFencePickRssi( DemoResult_t *res )
 {
     int8_t rssi;
     uint16_t i;
@@ -25,7 +28,7 @@ static int8_t RangingFencePickRssi( DemoResult_t *res )     //RSSI信号检查
     return res->RssiValue;
 }
 
-static double RangingFenceMedian( double *values, uint8_t count )   //中位数计算
+static double RangingFenceMedian( double *values, uint8_t count )
 {
     double sorted[FENCE_FILTER_WINDOW];
     uint8_t i;
@@ -42,11 +45,11 @@ static double RangingFenceMedian( double *values, uint8_t count )   //中位数�
         sorted[i] = values[i];
     }
 
-    for( pass = 0u; pass < ( count - 1u ); ++pass )    //冒泡排序取中位数
+    for( pass = 0u; pass < ( count - 1u ); ++pass )
     {
         for( k = 0u; k < ( count - 1u - pass ); ++k )
         {
-            if( sorted[k] > sorted[k + 1u] )          
+            if( sorted[k] > sorted[k + 1u] )
             {
                 double temp = sorted[k];
                 sorted[k] = sorted[k + 1u];
@@ -55,12 +58,22 @@ static double RangingFenceMedian( double *values, uint8_t count )   //中位数�
         }
     }
 
-    if( ( count % 2u ) == 0u )        //如果是偶数个则取中间两个平均值，奇数个数据则取中间那个
+    if( ( count % 2u ) == 0u )
     {
         return ( sorted[count / 2u - 1u] + sorted[count / 2u] ) * 0.5;
     }
 
     return sorted[count / 2u];
+}
+
+static float RangingFenceGetSpreadRatioLimit( double roundDist )
+{
+    if( roundDist > ( double )FENCE_GATE_SPREAD_FAR_THRESH_M )
+    {
+        return FENCE_GATE_SPREAD_RATIO_FAR;
+    }
+
+    return FENCE_GATE_MAX_RAW_SPREAD_RATIO;
 }
 
 static uint8_t RangingFenceCheckRawSpread( DemoResult_t *res )
@@ -69,11 +82,12 @@ static uint8_t RangingFenceCheckRawSpread( DemoResult_t *res )
     double maxVal;
     double median;
     double spread;
+    float limit;
     uint16_t i;
 
-    if( res->RngResultIndex < 3 )   //只有达到3个Hop才能计算离散度
+    if( res->RngResultIndex < 3u )
     {
-        return 1u;                   //样本数太少
+        return 1u;
     }
 
     minVal = res->RngResults[0];
@@ -90,14 +104,15 @@ static uint8_t RangingFenceCheckRawSpread( DemoResult_t *res )
         }
     }
 
-    median = ( maxVal + minVal ) * 0.5;    //最大+最小/2  ，作为中位数近似
+    median = ( maxVal + minVal ) * 0.5;
     if( median <= 0.0 )
     {
         return 1u;
     }
 
-    spread = ( maxVal - minVal ) / median;      //离散度计算
-    if( spread > ( double )FENCE_GATE_MAX_RAW_SPREAD_RATIO )
+    limit  = RangingFenceGetSpreadRatioLimit( res->RngDistance );
+    spread = ( maxVal - minVal ) / median;
+    if( spread > ( double )limit )
     {
         return 0u;
     }
@@ -115,121 +130,291 @@ static uint8_t RangingFenceGetMinSamples( DemoSettings_t *cfg )
     return ( uint8_t )( ( cfg->RngRequestCount + 1u ) / 2u );
 }
 
-static RangingFenceGateReason_t RangingFenceEvaluateGate( DemoResult_t *res, DemoSettings_t *cfg )
+static RangingFenceGateReason_t RangingFenceCheckHard( DemoResult_t *res, DemoSettings_t *cfg )
 {
     int8_t rssi;
     uint8_t minSamples;
 
-    if( cfg->RngStatus != RNG_VALID )   //芯片状态检查
+    if( cfg->RngStatus != RNG_VALID )
     {
         return RNG_FENCE_GATE_INVALID_STATUS;
     }
 
-    if( res->RngDistance <= 0.0 )      //距离有效性检查
+    if( res->RngDistance <= 0.0 )
     {
         return RNG_FENCE_GATE_INVALID_STATUS;
     }
 
-    minSamples = RangingFenceGetMinSamples( cfg );      //样本数检查
+    minSamples = RangingFenceGetMinSamples( cfg );
     if( ( uint8_t )res->RngResultIndex < minSamples )
     {
         return RNG_FENCE_GATE_LOW_SAMPLES;
     }
 
-    rssi = RangingFencePickRssi( res );               //RSSI检查
+    rssi = RangingFencePickRssi( res );
     if( ( rssi != 0 ) && ( rssi < FENCE_GATE_MIN_RSSI_DBM ) )
     {
         return RNG_FENCE_GATE_BAD_RSSI;
     }
 
-    if( RangingFenceCheckRawSpread( res ) == 0u )       //hop离散度检查
+    if( ( s_fence.hasPublished != 0u ) &&
+        ( s_trendCount < FENCE_TRACK_CONFIRM_ROUNDS ) &&
+        ( res->RngDistance < s_fence.publishedDistance - ( double )FENCE_GATE_MAX_JUMP_DOWN_M ) )
     {
-        return RNG_FENCE_GATE_HIGH_SPREAD;
-    }
-
-    if( ( s_fence.hasPublished != 0u ) &&       //跳变检查，向上为4米，向下1.5米
-        ( res->RngDistance > 0.0 ) &&
-        ( s_fence.publishedDistance > 0.0 ) )
-    {
-        double delta = res->RngDistance - s_fence.publishedDistance;
-        double absDelta;
-
-        if( delta > ( double )FENCE_GATE_MAX_JUMP_UP_M )
-        {
-            return RNG_FENCE_GATE_JUMP;
-        }
-        if( delta < -( double )FENCE_GATE_MAX_JUMP_DOWN_M )
-        {
-            return RNG_FENCE_GATE_JUMP;
-        }
-
-        absDelta = delta;
-        if( absDelta < 0.0 )       //偏差大于0.8米也拒绝
-        {
-            absDelta = -absDelta;
-        }
-        if( absDelta > ( double )FENCE_GATE_MAX_PUB_RND_DELTA_M )
-        {
-            return RNG_FENCE_GATE_PUB_RND_DELTA;
-        }
+        return RNG_FENCE_GATE_JUMP;
     }
 
     return RNG_FENCE_GATE_OK;
 }
 
-static void RangingFencePushFilter( double distance )         //循环缓冲区
-{
-    s_filterWindow[s_filterWriteIdx] = distance;             //存入新值
-    s_filterWriteIdx = ( uint8_t )( ( s_filterWriteIdx + 1u ) % FENCE_FILTER_WINDOW );    //移动指针
-    if( s_filterCount < FENCE_FILTER_WINDOW )
-    {
-        s_filterCount++;                                   //未填满则加1
-    }
-}
-
-void RangingFenceInit( void )      //围栏初始化
+static void RangingFenceTrendClear( void )
 {
     uint8_t i;
 
-    s_fence.roundDistance = 0.0;
-    s_fence.filteredDistance = 0.0;
-    s_fence.publishedDistance = 0.0;
-    s_fence.sampleCount = 0u;
-    s_fence.rssiDbm = 0;
-    s_fence.gatePassed = 0u;
-    s_fence.hasPublished = 0u;
-    s_fence.gateReason = RNG_FENCE_GATE_OK;
+    s_trendCount = 0u;
+    for( i = 0u; i < FENCE_TREND_WINDOW; ++i )
+    {
+        s_trendRnd[i] = 0.0;
+    }
+}
 
-    s_filterCount = 0u;
+static void RangingFenceTrendPush( double rnd )
+{
+    if( s_trendCount < FENCE_TREND_WINDOW )
+    {
+        s_trendRnd[s_trendCount] = rnd;
+        s_trendCount++;
+    }
+    else
+    {
+        uint8_t i;
+
+        for( i = 1u; i < FENCE_TREND_WINDOW; ++i )
+        {
+            s_trendRnd[i - 1u] = s_trendRnd[i];
+        }
+        s_trendRnd[FENCE_TREND_WINDOW - 1u] = rnd;
+    }
+}
+
+static void RangingFenceTrendStats( double *median, double *spread )
+{
+    double minVal;
+    double maxVal;
+    uint8_t i;
+
+    *median = RangingFenceMedian( s_trendRnd, s_trendCount );
+    minVal  = s_trendRnd[0];
+    maxVal  = s_trendRnd[0];
+    for( i = 1u; i < s_trendCount; ++i )
+    {
+        if( s_trendRnd[i] < minVal )
+        {
+            minVal = s_trendRnd[i];
+        }
+        if( s_trendRnd[i] > maxVal )
+        {
+            maxVal = s_trendRnd[i];
+        }
+    }
+    *spread = maxVal - minVal;
+}
+
+static uint8_t RangingFenceTrendMonotonicAway( void )
+{
+    uint8_t i;
+
+    if( s_trendCount < 2u )
+    {
+        return 0u;
+    }
+
+    for( i = 1u; i < s_trendCount; ++i )
+    {
+        if( s_trendRnd[i] + ( double )FENCE_TRACK_MONO_TOL_M < s_trendRnd[i - 1u] )
+        {
+            return 0u;
+        }
+    }
+
+    return 1u;
+}
+
+static void RangingFencePushFilter( double distance )
+{
+    s_filterWindow[s_filterWriteIdx] = distance;
+    s_filterWriteIdx = ( uint8_t )( ( s_filterWriteIdx + 1u ) % FENCE_FILTER_WINDOW );
+    if( s_filterCount < FENCE_FILTER_WINDOW )
+    {
+        s_filterCount++;
+    }
+}
+
+static void RangingFencePublishOk( double distance )
+{
+    RangingFenceTrendClear();
+    RangingFencePushFilter( distance );
+    s_fence.filteredDistance  = RangingFenceMedian( s_filterWindow, s_filterCount );
+    s_fence.publishedDistance = s_fence.filteredDistance;
+    s_fence.hasPublished      = 1u;
+    s_fence.gatePassed        = 1u;
+    s_fence.gateReason        = RNG_FENCE_GATE_OK;
+}
+
+static void RangingFencePublishTrack( double trendMedian, double published )
+{
+    double delta;
+    double step;
+    double next;
+
+    delta = trendMedian - published;
+    if( delta > 0.0 )
+    {
+        step = delta;
+        if( step > ( double )FENCE_TRACK_CREEP_FAR_MAX_M )
+        {
+            step = ( double )FENCE_TRACK_CREEP_FAR_MAX_M;
+        }
+    }
+    else
+    {
+        step = delta;
+        if( step < -( double )FENCE_TRACK_CREEP_NEAR_MAX_M )
+        {
+            step = -( double )FENCE_TRACK_CREEP_NEAR_MAX_M;
+        }
+    }
+
+    next = published + step;
+    RangingFenceTrendClear();
+    RangingFencePushFilter( next );
+    s_fence.filteredDistance  = RangingFenceMedian( s_filterWindow, s_filterCount );
+    s_fence.publishedDistance = s_fence.filteredDistance;
+    s_fence.hasPublished      = 1u;
+    s_fence.gatePassed        = 1u;
+    s_fence.gateReason        = RNG_FENCE_GATE_TRACK;
+}
+
+static void RangingFenceTryTrendTrack( void )
+{
+    double trendMedian;
+    double trendSpread;
+    double delta;
+    double spreadLimit;
+
+    if( s_trendCount < FENCE_TRACK_CONFIRM_ROUNDS )
+    {
+        s_fence.gatePassed = 0u;
+        s_fence.gateReason = RNG_FENCE_GATE_PENDING;
+        return;
+    }
+
+    RangingFenceTrendStats( &trendMedian, &trendSpread );
+
+    spreadLimit = ( double )FENCE_TRACK_RND_SPREAD_MAX_M;
+    if( RangingFenceTrendMonotonicAway() != 0u )
+    {
+        spreadLimit = ( double )FENCE_TRACK_RND_SPREAD_FAR_M;
+    }
+
+    if( trendSpread > spreadLimit )
+    {
+        RangingFenceTrendClear();
+        s_fence.gatePassed = 0u;
+        s_fence.gateReason = RNG_FENCE_GATE_ANOMALY;
+        return;
+    }
+
+    if( s_fence.hasPublished == 0u )
+    {
+        RangingFencePublishOk( trendMedian );
+        return;
+    }
+
+    delta = trendMedian - s_fence.publishedDistance;
+    if( delta < 0.0 )
+    {
+        delta = -delta;
+    }
+    if( delta < ( double )FENCE_TRACK_MIN_DELTA_M )
+    {
+        s_fence.gatePassed = 0u;
+        s_fence.gateReason = RNG_FENCE_GATE_PENDING;
+        return;
+    }
+
+    RangingFencePublishTrack( trendMedian, s_fence.publishedDistance );
+}
+
+void RangingFenceInit( void )
+{
+    uint8_t i;
+
+    s_fence.roundDistance     = 0.0;
+    s_fence.filteredDistance  = 0.0;
+    s_fence.publishedDistance = 0.0;
+    s_fence.sampleCount       = 0u;
+    s_fence.rssiDbm           = 0;
+    s_fence.gatePassed        = 0u;
+    s_fence.hasPublished      = 0u;
+    s_fence.gateReason        = RNG_FENCE_GATE_OK;
+
+    s_filterCount    = 0u;
     s_filterWriteIdx = 0u;
     for( i = 0u; i < FENCE_FILTER_WINDOW; ++i )
     {
         s_filterWindow[i] = 0.0;
     }
+
+    RangingFenceTrendClear();
 }
 
-void RangingFenceProcessRound( DemoResult_t *res, DemoSettings_t *cfg )  
+void RangingFenceProcessRound( DemoResult_t *res, DemoSettings_t *cfg )
 {
-    RangingFenceGateReason_t reason;     //记录的本轮原始数据
+    RangingFenceGateReason_t hard;
+    double delta;
+    double absDelta;
+    uint8_t spreadOk;
 
     s_fence.roundDistance = res->RngDistance;
-    s_fence.sampleCount = ( uint8_t )res->RngResultIndex;
-    s_fence.rssiDbm = RangingFencePickRssi( res );  
-    s_fence.gatePassed = 0u;
+    s_fence.sampleCount   = ( uint8_t )res->RngResultIndex;
+    s_fence.rssiDbm       = RangingFencePickRssi( res );
+    s_fence.gatePassed    = 0u;
 
-    reason = RangingFenceEvaluateGate( res, cfg );    //执行门控检查
-    s_fence.gateReason = reason;
-
-    if( reason != RNG_FENCE_GATE_OK )            //不通过直接返回。publishedDistance不变
+    hard = RangingFenceCheckHard( res, cfg );
+    if( hard != RNG_FENCE_GATE_OK )
     {
+        RangingFenceTrendClear();
+        s_fence.gateReason = hard;
         return;
     }
 
-    s_fence.gatePassed = 1u;              //通过、压入窗口、取中位数、更新发布值
-    RangingFencePushFilter( res->RngDistance );  //
-    s_fence.filteredDistance = RangingFenceMedian( s_filterWindow, s_filterCount );
-    s_fence.publishedDistance = s_fence.filteredDistance;
-    s_fence.hasPublished = 1u;
+    spreadOk = RangingFenceCheckRawSpread( res );
+
+    if( spreadOk != 0u )
+    {
+        if( s_fence.hasPublished == 0u )
+        {
+            RangingFencePublishOk( res->RngDistance );
+            return;
+        }
+
+        delta = res->RngDistance - s_fence.publishedDistance;
+        absDelta = delta;
+        if( absDelta < 0.0 )
+        {
+            absDelta = -absDelta;
+        }
+
+        if( absDelta <= ( double )FENCE_GATE_STATIC_DELTA_M )
+        {
+            RangingFencePublishOk( res->RngDistance );
+            return;
+        }
+    }
+
+    RangingFenceTrendPush( res->RngDistance );
+    RangingFenceTryTrendTrack();
 }
 
 const RangingFenceOutput_t *RangingFenceGetOutput( void )

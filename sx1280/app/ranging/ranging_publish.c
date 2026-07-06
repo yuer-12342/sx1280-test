@@ -46,10 +46,17 @@ void RangingPublishUpdateFromRound( DemoResult_t *res, DemoSettings_t *cfg )
 
     if( fence->gatePassed != 0u )
     {
-        s_publish.distance_m = (float)fence->publishedDistance;     //通过
-        s_publish.validity   = RNG_PUBLISH_OK;
-        s_lastOkTickMs       = now;
-        s_publish.age_ms     = 0u;
+        s_publish.distance_m = (float)fence->publishedDistance;
+        if( fence->gateReason == RNG_FENCE_GATE_TRACK )
+        {
+            s_publish.validity = RNG_PUBLISH_TRACK;
+        }
+        else
+        {
+            s_publish.validity = RNG_PUBLISH_OK;
+        }
+        s_lastOkTickMs   = now;
+        s_publish.age_ms = 0u;
     }
     else if( fence->hasPublished != 0u )
     {

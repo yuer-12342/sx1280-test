@@ -87,7 +87,7 @@ MASTER SN：________  SLAVE SN：________
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Step 0  确认固件 F0 门控已烧录；FENCE_ALARM_USE_RND=1（默认）  │
+│  Step 0  确认 F3 趋势门控已烧录（见 RANGING_GATE_F3_DESIGN.md）│
 ├─────────────────────────────────────────────────────────┤
 │  Step 1  S — 近区稳定（3 m 固定）                        │
 │          不过 → 调摆位/泡沫垫，重测；不测 Z/A              │
@@ -260,8 +260,9 @@ T_alarm = M_mid  - 0.5 m  = ______ m   （高于 → 倾向 OUT!）
 
 **固件：**
 
-- 统计/验收用 **Rnd**
-- 报警默认 **`FENCE_ALARM_USE_RND=1`**（Rnd 判距，Hold 也计数；Set 仍 3/5/10/15）
+- **S / Z 统计：** Done 或 **Trk** 的 Rnd/Dist（Hold/Wait/Ano 不计）
+- **报警：** 默认 **Dist**（`FENCE_ALARM_USE_RND=0`，OK+Trk 有效）
+- **动态拉远：** Stat 应出现 **Trk**，Dist 约 12～20 s 跟上
 - 室内快验另开 **`FENCE_ALARM_INDOOR_DEMO=1`**
 
 **屏 Set 与真距映射（DEMO 操作，非卷尺）：**
@@ -294,13 +295,13 @@ T_alarm = M_mid  - 0.5 m  = ______ m   （高于 → 倾向 OUT!）
 
 ```
 T_clear = ___   T_alarm = ___
-判距来源：Rnd（`FENCE_ALARM_USE_RND=1`，默认）
+判距来源：Dist（OK+Trk，`FENCE_ALARM_USE_RND=0` 默认）
 
 A2 第1轮：延迟 ___ s   A2 第2轮：___ s
 A3 第1轮：延迟 ___ s   A3 第2轮：___ s
 ```
 
-**说明：** 动态拉远时 Dist 可能 Hold；固件已用 **Rnd** 判报警（`FENCE_ALARM_USE_RND=1`）。
+**说明：** 3 m→6 m 拉远时 Stat 应出现 **Trk**，Dist 限速跟上；Hold/Wait 为累积或拒异变。
 
 ---
 
@@ -369,7 +370,8 @@ A3 第1轮：延迟 ___ s   A3 第2轮：___ s
 ## 13. 固件检查清单（测前）
 
 - [ ] F0：`Jump` 下跳 1.5 m / 上跳 4 m；`|Rnd−Dist|>0.8` → Hold
-- [ ] `FENCE_ALARM_USE_RND=1`（默认，户外 Set 3/5/10/15 + Rnd 报警）
+- [ ] F3 趋势门控（`ranging_fence.c` + `RANGING_GATE_F3_DESIGN.md`）
+- [ ] `FENCE_ALARM_USE_RND=0`（Dist 报警，OK+Trk）
 - [ ] 长按 3 s / 短按 Set 已验证
 - [ ] Git commit 记入表头
 

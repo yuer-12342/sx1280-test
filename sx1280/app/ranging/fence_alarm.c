@@ -1,12 +1,9 @@
 /*
- * 稳定判区户外版（默认）：
- *   FENCE_ALARM_USE_RND=1      报警用 Rnd，Hold 也计数
- *   FENCE_ALARM_INDOOR_DEMO=0  Set 3/5/10/15，默认 5，3 轮触发，滞回 1 m
- * 室内快验：FENCE_ALARM_INDOOR_DEMO=1（Set 0.6～1.5，2 轮触发）
- * 恢复 Dist 报警：FENCE_ALARM_USE_RND=0
+ * F3 趋势门控：默认 Dist 报警（OK + TRACK）。
+ * FENCE_ALARM_USE_RND=1 恢复仅用 Rnd 判报警。
  */
 #ifndef FENCE_ALARM_USE_RND
-#define FENCE_ALARM_USE_RND          1
+#define FENCE_ALARM_USE_RND          0
 #endif
 #ifndef FENCE_ALARM_INDOOR_DEMO
 #define FENCE_ALARM_INDOOR_DEMO      0
@@ -97,7 +94,8 @@ static uint8_t FenceAlarmPickDistanceM( const RangingPublish_t *pub, float *dist
 #else
 static uint8_t FenceAlarmPickDistanceM( const RangingPublish_t *pub, float *distanceM )
 {
-    if( pub->validity != RNG_PUBLISH_OK )
+    if( ( pub->validity != RNG_PUBLISH_OK ) &&
+        ( pub->validity != RNG_PUBLISH_TRACK ) )
     {
         return 0u;
     }

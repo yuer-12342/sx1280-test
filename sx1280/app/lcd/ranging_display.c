@@ -7,6 +7,7 @@
 
 #define RNG_DISPLAY_HOLD    250u
 #define RNG_DISPLAY_RAW     251u
+#define RNG_DISPLAY_TRACK   252u
 
 /*
  * 80x160 标定屏布局（12px 字，行距 16）
@@ -37,6 +38,8 @@ static const u8 *RangingDisplayStatusText(uint8_t status)
         return (const u8 *)"Err";
     case RNG_DISPLAY_RAW:
         return (const u8 *)"Raw";
+    case RNG_DISPLAY_TRACK:
+        return (const u8 *)"Trk";
     case RNG_INIT:
     default:
         if (status == RNG_DISPLAY_HOLD)
@@ -174,6 +177,12 @@ static const u8 *RangingDisplayGateText( RangingFenceGateReason_t reason )
         return (const u8 *)"Jump";
     case RNG_FENCE_GATE_PUB_RND_DELTA:
         return (const u8 *)"dRnd";
+    case RNG_FENCE_GATE_TRACK:
+        return (const u8 *)"Trk ";
+    case RNG_FENCE_GATE_ANOMALY:
+        return (const u8 *)"Ano ";
+    case RNG_FENCE_GATE_PENDING:
+        return (const u8 *)"Wait";
     default:
         return (const u8 *)"??? ";
     }
@@ -224,6 +233,10 @@ static uint8_t RangingDisplayResolveStatus(uint8_t status, DemoResult_t *res)
         if( pub->validity == RNG_PUBLISH_HOLD )
         {
             return RNG_DISPLAY_HOLD;
+        }
+        if( pub->validity == RNG_PUBLISH_TRACK )
+        {
+            return RNG_DISPLAY_TRACK;
         }
         if( pub->validity == RNG_PUBLISH_RAW )
         {
@@ -323,6 +336,10 @@ static uint8_t RangingDisplayDrawValues(DemoResult_t *res, DemoSettings_t *cfg, 
         if( showStatus == RNG_DISPLAY_HOLD )
         {
             gateColor = RED;
+        }
+        else if( showStatus == RNG_DISPLAY_TRACK )
+        {
+            gateColor = YELLOW;
         }
         else if( pub->gate_reason != RNG_FENCE_GATE_OK )
         {

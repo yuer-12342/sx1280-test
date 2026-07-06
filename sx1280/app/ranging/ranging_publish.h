@@ -8,8 +8,9 @@
 /*!
  * \brief 对外发布有效性（Step-2 统一语义）
  *
- * OK   : 本轮门控通过，distance_m = 滤波发布值
- * HOLD : 本轮门控未过，distance_m = 上次 OK 发布值（age_ms 递增）
+ * OK    : L2 稳态通过，distance_m = 滤波发布值
+ * TRACK : L3 趋势限速更新，distance_m = 跟踪后发布值
+ * HOLD  : 未通过或累积中，distance_m = 上次发布值
  * RAW  : 尚无历史发布，distance_m = 本轮中值（预热）
  * INV  : 无可用距离
  */
@@ -17,6 +18,7 @@ typedef enum
 {
     RNG_PUBLISH_INVALID = 0,
     RNG_PUBLISH_OK,
+    RNG_PUBLISH_TRACK,
     RNG_PUBLISH_HOLD,
     RNG_PUBLISH_RAW,
 } RangingPublishValidity_t;

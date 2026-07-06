@@ -5,8 +5,8 @@
 
 /*
  * 标定/阶段 A：轮末快照，Keil Watch 读 g_RangingDevLog。
- * validity: 0=INV 1=OK 2=HOLD 3=RAW
- * gate:     0=OK 1=INV_STATUS 2=LOW_SAMPLES 3=BAD_RSSI 4=HIGH_SPREAD 5=JUMP 6=PUB_RND_DELTA
+ * validity: 0=INV 1=OK 2=TRACK 3=HOLD 4=RAW
+ * gate:     0=OK 1=INV 2=LOW 3=RSSI 4=SPREAD 5=JUMP 6=dRND 7=TRK 8=ANO 9=WAIT
  */
 typedef struct
 {
